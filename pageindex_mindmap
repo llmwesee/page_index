@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PageIndex — Tree Indexing & Retrieval Visualization</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;600;800&display=swap');
+
+:root {
+–bg: #05070f;
+–surface: #0c0f1e;
+–surface2: #111530;
+–border: #1e2440;
+–accent: #4fffb0;
+–accent2: #5c7dff;
+–accent3: #ff6b6b;
+–accent4: #ffd166;
+–text: #d0d8f0;
+–text-dim: #6070a0;
+–node-index: #4fffb0;
+–node-retrieval: #5c7dff;
+–node-llm: #ff9a3c;
+–node-answer: #c084fc;
+}
+
+- { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+background: var(–bg);
+color: var(–text);
+font-family: ‘Outfit’, sans-serif;
+min-height: 100vh;
+overflow-x: hidden;
+}
+
+/* Animated background grid */
+body::before {
+content: ‘’;
+position: fixed;
+inset: 0;
+background-image:
+linear-gradient(rgba(92, 125, 255, 0.04) 1px, transparent 1px),
+linear-gradient(90deg, rgba(92, 125, 255, 0.04) 1px, transparent 1px);
+background-size: 48px 48px;
+pointer-events: none;
+z-index: 0;
+}
+
+.container {
+position: relative;
+z-index: 1;
+max-width: 1400px;
+margin: 0 auto;
+padding: 40px 24px 80px;
+}
+
+/* ── HEADER ── */
+header {
+text-align: center;
+margin-bottom: 64px;
+animation: fadeDown 0.8s ease both;
+}
+
+header .badge {
+display: inline-block;
+background: rgba(79, 255, 176, 0.1);
+border: 1px solid rgba(79, 255, 176, 0.3);
+color: var(–accent);
+font-family: ‘Space Mono’, monospace;
+font-size: 11px;
+letter-spacing: 3px;
+text-transform: uppercase;
+padding: 6px 16px;
+border-radius: 100px;
+margin-bottom: 20px;
+}
+
+header h1 {
+font-size: clamp(36px, 6vw, 72px);
+font-weight: 800;
+line-height: 1.05;
+background: linear-gradient(135deg, #fff 30%, #4fffb0 60%, #5c7dff 100%);
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+background-clip: text;
+margin-bottom: 16px;
+}
+
+header p {
+color: var(–text-dim);
+font-size: 16px;
+font-weight: 300;
+max-width: 600px;
+margin: 0 auto;
+line-height: 1.7;
+}
+
+/* ── TABS ── */
+.tabs {
+display: flex;
+justify-content: center;
+gap: 8px;
+margin-bottom: 48px;
+flex-wrap: wrap;
+animation: fadeUp 0.8s 0.2s ease both;
+}
+
+.tab-btn {
+background: var(–surface);
+border: 1px solid var(–border);
+color: var(–text-dim);
+font-family: ‘Outfit’, sans-serif;
+font-size: 14px;
+font-weight: 600;
+padding: 10px 22px;
+border-radius: 8px;
+cursor: pointer;
+transition: all 0.2s;
+letter-spacing: 0.3px;
+}
+
+.tab-btn:hover {
+border-color: var(–accent2);
+color: var(–text);
+}
+
+.tab-btn.active {
+background: linear-gradient(135deg, rgba(79,255,176,0.15), rgba(92,125,255,0.15));
+border-color: var(–accent);
+color: var(–accent);
+}
+
+.tab-panel { display: none; animation: fadeUp 0.4s ease both; }
+.tab-panel.active { display: block; }
+
+/* ── SECTION HEADINGS ── */
+.section-title {
+font-size: 13px;
+font-weight: 600;
+letter-spacing: 3px;
+text-transform: uppercase;
+color: var(–text-dim);
+font-family: ‘Space Mono’, monospace;
+margin-bottom: 24px;
+padding-left: 16px;
+border-left: 3px solid var(–accent2);
+}
+
+/* ── MIND MAP SVG PANEL ── */
+.mindmap-wrapper {
+background: var(–surface);
+border: 1px solid var(–border);
+border-radius: 16px;
+overflow: hidden;
+position: relative;
+}
+
+.mindmap-wrapper svg {
+display: block;
+width: 100%;
+height: auto;
+}
+
+/* ── FLOW PANELS ── */
+.flow-section { margin-bottom: 48px; }
+
+.flow-title {
+font-size: 22px;
+font-weight: 700;
+margin-bottom: 8px;
+display: flex;
+align-items: center;
+gap: 12px;
+}
+
+.flow-title .dot {
+width: 12px; height: 12px; border-radius: 50%;
+flex-shrink: 0;
+}
+
+.flow-subtitle {
+color: var(–text-dim);
+font-size: 14px;
+margin-bottom: 28px;
+padding-left: 24px;
+}
+
+/* ── PIPELINE STEPS ── */
+.pipeline {
+display: flex;
+flex-direction: column;
+gap: 0;
+}
+
+.step {
+display: grid;
+grid-template-columns: 48px 1fr;
+gap: 0 20px;
+position: relative;
+}
+
+.step-connector {
+display: flex;
+flex-direction: column;
+align-items: center;
+}
+
+.step-num {
+width: 48px; height: 48px;
+border-radius: 12px;
+display: flex;
+align-items: center;
+justify-content: center;
+font-family: ‘Space Mono’, monospace;
+font-weight: 700;
+font-size: 14px;
+flex-shrink: 0;
+position: relative;
+z-index: 2;
+}
+
+.step-line {
+width: 2px;
+flex: 1;
+min-height: 24px;
+background: linear-gradient(to bottom, var(–border), transparent);
+margin: 4px 0;
+}
+
+.step-body {
+padding: 0 0 28px 0;
+}
+
+.step-header {
+display: flex;
+align-items: flex-start;
+gap: 12px;
+margin-bottom: 12px;
+padding-top: 10px;
+}
+
+.step-label {
+font-size: 16px;
+font-weight: 700;
+}
+
+.step-tag {
+font-family: ‘Space Mono’, monospace;
+font-size: 10px;
+letter-spacing: 2px;
+padding: 3px 10px;
+border-radius: 100px;
+text-transform: uppercase;
+flex-shrink: 0;
+margin-top: 3px;
+}
+
+.step-desc {
+color: var(–text-dim);
+font-size: 14px;
+line-height: 1.7;
+margin-bottom: 12px;
+}
+
+.step-detail {
+background: var(–surface2);
+border: 1px solid var(–border);
+border-radius: 10px;
+padding: 14px 16px;
+}
+
+.step-detail-row {
+display: flex;
+gap: 10px;
+align-items: flex-start;
+margin-bottom: 8px;
+font-size: 13px;
+line-height: 1.5;
+}
+
+.step-detail-row:last-child { margin-bottom: 0; }
+
+.step-detail-key {
+font-family: ‘Space Mono’, monospace;
+font-size: 11px;
+color: var(–accent);
+white-space: nowrap;
+padding-top: 1px;
+min-width: 120px;
+}
+
+.step-detail-val {
+color: var(–text-dim);
+}
+
+/* Color themes per phase */
+.phase-index .step-num { background: rgba(79,255,176,0.15); color: var(–accent); border: 1px solid rgba(79,255,176,0.3); }
+.phase-index .step-tag { background: rgba(79,255,176,0.1); color: var(–accent); border: 1px solid rgba(79,255,176,0.25); }
+.phase-index .step-line { background: linear-gradient(to bottom, rgba(79,255,176,0.3), transparent); }
+
+.phase-retrieval .step-num { background: rgba(92,125,255,0.15); color: var(–accent2); border: 1px solid rgba(92,125,255,0.3); }
+.phase-retrieval .step-tag { background: rgba(92,125,255,0.1); color: var(–accent2); border: 1px solid rgba(92,125,255,0.25); }
+.phase-retrieval .step-line { background: linear-gradient(to bottom, rgba(92,125,255,0.3), transparent); }
+
+.phase-answer .step-num { background: rgba(192,132,252,0.15); color: var(–node-answer); border: 1px solid rgba(192,132,252,0.3); }
+.phase-answer .step-tag { background: rgba(192,132,252,0.1); color: var(–node-answer); border: 1px solid rgba(192,132,252,0.25); }
+.phase-answer .step-line { background: linear-gradient(to bottom, rgba(192,132,252,0.3), transparent); }
+
+/* ── CODE BLOCK ── */
+.code-block {
+background: #020409;
+border: 1px solid var(–border);
+border-radius: 10px;
+padding: 16px 20px;
+font-family: ‘Space Mono’, monospace;
+font-size: 12px;
+line-height: 1.8;
+overflow-x: auto;
+color: #8899cc;
+margin-top: 10px;
+}
+
+.code-block .k { color: #5c7dff; }
+.code-block .s { color: #4fffb0; }
+.code-block .c { color: #3d4870; font-style: italic; }
+.code-block .n { color: #ffd166; }
+.code-block .v { color: #ff9a3c; }
+
+/* ── TREE VISUAL ── */
+.tree-visual {
+background: var(–surface);
+border: 1px solid var(–border);
+border-radius: 16px;
+padding: 32px;
+margin-bottom: 32px;
+overflow-x: auto;
+}
+
+.tree-visual svg { display: block; margin: 0 auto; }
+
+/* ── COMPARISON TABLE ── */
+.compare-table {
+width: 100%;
+border-collapse: collapse;
+border-radius: 12px;
+overflow: hidden;
+font-size: 14px;
+}
+
+.compare-table th {
+background: var(–surface2);
+color: var(–text-dim);
+font-family: ‘Space Mono’, monospace;
+font-size: 11px;
+letter-spacing: 2px;
+text-transform: uppercase;
+padding: 14px 16px;
+text-align: left;
+border-bottom: 1px solid var(–border);
+}
+
+.compare-table td {
+padding: 14px 16px;
+border-bottom: 1px solid var(–border);
+vertical-align: top;
+line-height: 1.6;
+color: var(–text-dim);
+}
+
+.compare-table td:first-child {
+color: var(–text);
+font-weight: 600;
+white-space: nowrap;
+}
+
+.compare-table tr:last-child td { border-bottom: none; }
+
+.compare-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+.tag-bad {
+display: inline-block;
+background: rgba(255,107,107,0.1);
+color: var(–accent3);
+border: 1px solid rgba(255,107,107,0.25);
+border-radius: 4px;
+padding: 2px 8px;
+font-size: 12px;
+font-family: ‘Space Mono’, monospace;
+margin-right: 4px;
+}
+
+.tag-good {
+display: inline-block;
+background: rgba(79,255,176,0.1);
+color: var(–accent);
+border: 1px solid rgba(79,255,176,0.25);
+border-radius: 4px;
+padding: 2px 8px;
+font-size: 12px;
+font-family: ‘Space Mono’, monospace;
+margin-right: 4px;
+}
+
+/* ── STAT CARDS ── */
+.stats-row {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+gap: 16px;
+margin-bottom: 40px;
+}
+
+.stat-card {
+background: var(–surface);
+border: 1px solid var(–border);
+border-radius: 12px;
+padding: 20px;
+text-align: center;
+}
+
+.stat-num {
+font-size: 32px;
+font-weight: 800;
+font-family: ‘Space Mono’, monospace;
+background: linear-gradient(135deg, var(–accent), var(–accent2));
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
+background-clip: text;
+display: block;
+margin-bottom: 6px;
+}
+
+.stat-label {
+font-size: 12px;
+color: var(–text-dim);
+font-weight: 600;
+letter-spacing: 1px;
+text-transform: uppercase;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeDown {
+from { opacity: 0; transform: translateY(-20px); }
+to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeUp {
+from { opacity: 0; transform: translateY(20px); }
+to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+0%, 100% { opacity: 1; }
+50% { opacity: 0.5; }
+}
+
+.pulse { animation: pulse 2s infinite; }
+
+/* ── INTERACTIVE TREE ── */
+.itree-container {
+background: var(–surface);
+border: 1px solid var(–border);
+border-radius: 16px;
+padding: 32px;
+overflow-x: auto;
+margin-bottom: 32px;
+}
+
+.itree-node {
+display: flex;
+flex-direction: column;
+align-items: flex-start;
+}
+
+.itree-card {
+display: flex;
+align-items: center;
+gap: 10px;
+background: var(–surface2);
+border: 1px solid var(–border);
+border-radius: 8px;
+padding: 10px 14px;
+cursor: pointer;
+transition: all 0.2s;
+min-width: 220px;
+position: relative;
+}
+
+.itree-card:hover {
+border-color: var(–accent2);
+transform: translateX(4px);
+}
+
+.itree-card.root {
+background: linear-gradient(135deg, rgba(79,255,176,0.12), rgba(92,125,255,0.08));
+border-color: rgba(79,255,176,0.4);
+min-width: 300px;
+}
+
+.itree-card.relevant {
+border-color: var(–accent);
+background: rgba(79,255,176,0.07);
+}
+
+.itree-dot {
+width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+
+.itree-label { font-size: 13px; font-weight: 600; }
+.itree-meta { font-size: 11px; font-family: ‘Space Mono’, monospace; color: var(–text-dim); }
+
+.itree-children {
+margin-left: 32px;
+margin-top: 8px;
+padding-left: 16px;
+border-left: 1px dashed var(–border);
+display: flex;
+flex-direction: column;
+gap: 8px;
+}
+
+.relevance-badge {
+position: absolute;
+right: 10px;
+top: 50%;
+transform: translateY(-50%);
+font-size: 10px;
+font-family: ‘Space Mono’, monospace;
+padding: 2px 8px;
+border-radius: 100px;
+background: rgba(79,255,176,0.15);
+color: var(–accent);
+border: 1px solid rgba(79,255,176,0.3);
+}
+
+.irrelevant-badge {
+position: absolute;
+right: 10px;
+top: 50%;
+transform: translateY(-50%);
+font-size: 10px;
+font-family: ‘Space Mono’, monospace;
+padding: 2px 8px;
+border-radius: 100px;
+background: rgba(255,107,107,0.1);
+color: var(–accent3);
+border: 1px solid rgba(255,107,107,0.25);
+}
+
+/* ── PROMPT REVEAL ── */
+.prompt-box {
+background: #010208;
+border: 1px solid var(–border);
+border-radius: 12px;
+overflow: hidden;
+margin-bottom: 24px;
+}
+
+.prompt-header {
+background: var(–surface2);
+padding: 10px 16px;
+display: flex;
+align-items: center;
+gap: 8px;
+border-bottom: 1px solid var(–border);
+}
+
+.prompt-header-dot {
+width: 8px; height: 8px; border-radius: 50%;
+}
+
+.prompt-header-label {
+font-family: ‘Space Mono’, monospace;
+font-size: 11px;
+color: var(–text-dim);
+letter-spacing: 1px;
+}
+
+.prompt-content {
+padding: 20px;
+font-family: ‘Space Mono’, monospace;
+font-size: 12px;
+line-height: 1.9;
+color: #8899cc;
+}
+
+.prompt-content .highlight { color: var(–accent); }
+.prompt-content .highlight2 { color: var(–accent2); }
+.prompt-content .highlight3 { color: var(–accent4); }
+.prompt-content .comment { color: #3d4870; font-style: italic; }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(–surface); }
+::-webkit-scrollbar-thumb { background: var(–border); border-radius: 3px; }
+
+/* responsive */
+@media (max-width: 640px) {
+.step { grid-template-columns: 40px 1fr; }
+.step-detail-key { min-width: 90px; }
+header h1 { font-size: 32px; }
+}
+</style>
+
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HEADER -->
+
+  <header>
+    <div class="badge">PageIndex · VectifyAI · Deep Dive</div>
+    <h1>Tree Indexing &amp; Reasoning Retrieval</h1>
+    <p>A complete visual map of how PageIndex builds hierarchical document trees and uses LLM reasoning to find the exact nodes that answer your query.</p>
+  </header>
+
+  <!-- STATS -->
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <span class="stat-num">98.7%</span>
+      <span class="stat-label">FinanceBench Accuracy</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">0</span>
+      <span class="stat-label">Vector DBs Needed</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">0</span>
+      <span class="stat-label">Chunking Steps</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">2</span>
+      <span class="stat-label">Core Pipeline Phases</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-num">GPT-4o</span>
+      <span class="stat-label">Default LLM Engine</span>
+    </div>
+  </div>
+
+  <!-- TABS -->
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('mindmap')">🗺 Mind Map</button>
+    <button class="tab-btn" onclick="switchTab('indexing')">🌲 Index Generation</button>
+    <button class="tab-btn" onclick="switchTab('retrieval')">🔍 Query Retrieval</button>
+    <button class="tab-btn" onclick="switchTab('prompts')">💬 LLM Prompts</button>
+    <button class="tab-btn" onclick="switchTab('compare')">⚖️ vs Vector RAG</button>
+  </div>
+
+  <!-- TAB: MIND MAP -->
+
+  <div class="tab-panel active" id="tab-mindmap">
+    <p class="section-title">Complete System Overview</p>
+    <div class="mindmap-wrapper">
+      <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg" style="background:#05070f;">
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#1e2440"/>
+          </marker>
+          <marker id="arr-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#4fffb0"/>
+          </marker>
+          <marker id="arr-blue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#5c7dff"/>
+          </marker>
+          <marker id="arr-purple" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#c084fc"/>
+          </marker>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="4" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <radialGradient id="centerGlow" cx="50%" cy="50%">
+            <stop offset="0%" stop-color="#4fffb0" stop-opacity="0.2"/>
+            <stop offset="100%" stop-color="transparent"/>
+          </radialGradient>
+        </defs>
+
+```
+    <!-- Background glow at center -->
+    <ellipse cx="600" cy="400" rx="200" ry="180" fill="url(#centerGlow)"/>
+
+    <!-- CENTER NODE: PageIndex -->
+    <rect x="460" y="345" width="280" height="110" rx="16" fill="#0c0f1e" stroke="#4fffb0" stroke-width="2" filter="url(#glow)"/>
+    <text x="600" y="383" text-anchor="middle" fill="#4fffb0" font-family="Space Mono" font-size="11" letter-spacing="3" font-weight="700">PAGEINDEX</text>
+    <text x="600" y="403" text-anchor="middle" fill="white" font-family="Outfit" font-size="17" font-weight="800">Reasoning-based RAG</text>
+    <text x="600" y="423" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="12">No Vectors · No Chunking</text>
+    <text x="600" y="440" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="12">Human-like Tree Navigation</text>
+
+    <!-- ── PHASE 1: INDEXING (LEFT SIDE) ── -->
+    <!-- Phase box -->
+    <rect x="20" y="80" width="340" height="60" rx="12" fill="#0c1a14" stroke="#4fffb0" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="190" y="107" text-anchor="middle" fill="#4fffb0" font-family="Space Mono" font-size="10" letter-spacing="2">PHASE 1 — INDEXING</text>
+    <text x="190" y="124" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">Build the document tree structure</text>
+
+    <!-- Nodes left side -->
+    <!-- PDF Input -->
+    <rect x="20" y="180" width="150" height="50" rx="10" fill="#111530" stroke="#1e2440" stroke-width="1"/>
+    <text x="95" y="202" text-anchor="middle" fill="#d0d8f0" font-family="Outfit" font-size="13" font-weight="700">PDF / Markdown</text>
+    <text x="95" y="220" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">Input Document</text>
+
+    <!-- TOC Extraction -->
+    <rect x="20" y="270" width="150" height="50" rx="10" fill="#111530" stroke="#4fffb0" stroke-width="1" stroke-opacity="0.5"/>
+    <text x="95" y="291" text-anchor="middle" fill="#4fffb0" font-family="Outfit" font-size="13" font-weight="700">TOC Extraction</text>
+    <text x="95" y="309" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">First 20 pages scan</text>
+
+    <!-- Page Segmentation -->
+    <rect x="20" y="360" width="150" height="50" rx="10" fill="#111530" stroke="#4fffb0" stroke-width="1" stroke-opacity="0.5"/>
+    <text x="95" y="381" text-anchor="middle" fill="#4fffb0" font-family="Outfit" font-size="13" font-weight="700">Page Segmentation</text>
+    <text x="95" y="399" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">≤10 pages per node</text>
+
+    <!-- LLM Summarization -->
+    <rect x="20" y="450" width="150" height="50" rx="10" fill="#111530" stroke="#4fffb0" stroke-width="1" stroke-opacity="0.5"/>
+    <text x="95" y="471" text-anchor="middle" fill="#4fffb0" font-family="Outfit" font-size="13" font-weight="700">LLM Summarization</text>
+    <text x="95" y="489" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">GPT-4o summaries</text>
+
+    <!-- Tree JSON Output -->
+    <rect x="20" y="540" width="150" height="50" rx="10" fill="#0c1a14" stroke="#4fffb0" stroke-width="1.5"/>
+    <text x="95" y="560" text-anchor="middle" fill="#4fffb0" font-family="Outfit" font-size="13" font-weight="700">Tree JSON Output</text>
+    <text x="95" y="578" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">node_id + summary + pages</text>
+
+    <!-- Node details -->
+    <rect x="190" y="540" width="220" height="100" rx="10" fill="#020409" stroke="#1e2440" stroke-width="1"/>
+    <text x="205" y="560" fill="#5c7dff" font-family="Space Mono" font-size="10">{</text>
+    <text x="215" y="578" fill="#4fffb0" font-family="Space Mono" font-size="10">"node_id": <tspan fill="#ffd166">"0006"</tspan>,</text>
+    <text x="215" y="594" fill="#4fffb0" font-family="Space Mono" font-size="10">"title": <tspan fill="#ffd166">"Fin. Stability"</tspan>,</text>
+    <text x="215" y="610" fill="#4fffb0" font-family="Space Mono" font-size="10">"start_index": <tspan fill="#ff9a3c">21</tspan>,</text>
+    <text x="215" y="626" fill="#4fffb0" font-family="Space Mono" font-size="10">"summary": <tspan fill="#ffd166">"..."</tspan></text>
+    <text x="205" y="630" fill="#5c7dff" font-family="Space Mono" font-size="10">}</text>
+
+    <!-- Arrows left -->
+    <line x1="95" y1="230" x2="95" y2="270" stroke="#4fffb0" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-green)"/>
+    <line x1="95" y1="320" x2="95" y2="360" stroke="#4fffb0" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-green)"/>
+    <line x1="95" y1="410" x2="95" y2="450" stroke="#4fffb0" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-green)"/>
+    <line x1="95" y1="500" x2="95" y2="540" stroke="#4fffb0" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-green)"/>
+    <line x1="170" y1="565" x2="190" y2="580" stroke="#4fffb0" stroke-width="1" stroke-opacity="0.4" stroke-dasharray="3,3"/>
+
+    <!-- Connection to center -->
+    <path d="M170 395 Q310 400 460 395" stroke="#4fffb0" stroke-width="1.5" stroke-opacity="0.4" fill="none" stroke-dasharray="5,4" marker-end="url(#arr-green)"/>
+
+    <!-- ── PHASE 2: RETRIEVAL (RIGHT SIDE) ── -->
+    <rect x="840" y="80" width="340" height="60" rx="12" fill="#0e1220" stroke="#5c7dff" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="1010" y="107" text-anchor="middle" fill="#5c7dff" font-family="Space Mono" font-size="10" letter-spacing="2">PHASE 2 — RETRIEVAL</text>
+    <text x="1010" y="124" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">LLM reasons over the tree index</text>
+
+    <!-- User Query -->
+    <rect x="1030" y="180" width="150" height="50" rx="10" fill="#111530" stroke="#1e2440" stroke-width="1"/>
+    <text x="1105" y="202" text-anchor="middle" fill="#d0d8f0" font-family="Outfit" font-size="13" font-weight="700">User Query</text>
+    <text x="1105" y="220" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">Natural language question</text>
+
+    <!-- Load Index into Context -->
+    <rect x="1030" y="270" width="150" height="50" rx="10" fill="#111530" stroke="#5c7dff" stroke-width="1" stroke-opacity="0.5"/>
+    <text x="1105" y="291" text-anchor="middle" fill="#5c7dff" font-family="Outfit" font-size="13" font-weight="700">In-Context Index</text>
+    <text x="1105" y="309" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">Full tree JSON in prompt</text>
+
+    <!-- LLM Tree Reasoning -->
+    <rect x="1030" y="360" width="150" height="50" rx="10" fill="#111530" stroke="#5c7dff" stroke-width="1" stroke-opacity="0.5"/>
+    <text x="1105" y="381" text-anchor="middle" fill="#5c7dff" font-family="Outfit" font-size="13" font-weight="700">LLM Tree Reasoning</text>
+    <text x="1105" y="399" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">Select relevant node_ids</text>
+
+    <!-- Page Content Fetch -->
+    <rect x="1030" y="450" width="150" height="50" rx="10" fill="#111530" stroke="#5c7dff" stroke-width="1" stroke-opacity="0.5"/>
+    <text x="1105" y="471" text-anchor="middle" fill="#5c7dff" font-family="Outfit" font-size="13" font-weight="700">Content Extraction</text>
+    <text x="1105" y="489" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">Fetch raw text from pages</text>
+
+    <!-- Answer Generation -->
+    <rect x="1030" y="540" width="150" height="50" rx="10" fill="#160e1e" stroke="#c084fc" stroke-width="1.5"/>
+    <text x="1105" y="560" text-anchor="middle" fill="#c084fc" font-family="Outfit" font-size="13" font-weight="700">Answer Generation</text>
+    <text x="1105" y="578" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">LLM + retrieved context</text>
+
+    <!-- Prompt skeleton right -->
+    <rect x="840" y="540" width="180" height="100" rx="10" fill="#020409" stroke="#1e2440" stroke-width="1"/>
+    <text x="856" y="560" fill="#6070a0" font-family="Space Mono" font-size="9" font-style="italic"># LLM Node-Select Prompt:</text>
+    <text x="856" y="578" fill="#8899cc" font-family="Space Mono" font-size="9">Given the tree structure</text>
+    <text x="856" y="594" fill="#8899cc" font-family="Space Mono" font-size="9">and question, return:</text>
+    <text x="856" y="610" fill="#5c7dff" font-family="Space Mono" font-size="9">{ "thinking": ...,</text>
+    <text x="856" y="626" fill="#5c7dff" font-family="Space Mono" font-size="9">  "node_list": [...] }</text>
+
+    <!-- Arrows right -->
+    <line x1="1105" y1="230" x2="1105" y2="270" stroke="#5c7dff" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-blue)"/>
+    <line x1="1105" y1="320" x2="1105" y2="360" stroke="#5c7dff" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-blue)"/>
+    <line x1="1105" y1="410" x2="1105" y2="450" stroke="#5c7dff" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-blue)"/>
+    <line x1="1105" y1="500" x2="1105" y2="540" stroke="#c084fc" stroke-width="1.5" stroke-opacity="0.5" marker-end="url(#arr-purple)"/>
+    <line x1="1030" y1="565" x2="1020" y2="580" stroke="#5c7dff" stroke-width="1" stroke-opacity="0.4" stroke-dasharray="3,3"/>
+
+    <!-- Connection center to right -->
+    <path d="M740 395 Q870 400 1030 385" stroke="#5c7dff" stroke-width="1.5" stroke-opacity="0.4" fill="none" stroke-dasharray="5,4" marker-end="url(#arr-blue)"/>
+
+    <!-- ── TOP LABELS ── -->
+    <rect x="460" y="170" width="280" height="60" rx="10" fill="#111530" stroke="#1e2440" stroke-width="1"/>
+    <text x="600" y="196" text-anchor="middle" fill="#ffd166" font-family="Outfit" font-size="13" font-weight="700">Key Design Principles</text>
+    <text x="600" y="218" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">Similarity ≠ Relevance · AlphaGo-style tree search</text>
+
+    <!-- ── BOTTOM: OUTPUT CONCEPTS ── -->
+    <rect x="380" y="680" width="200" height="50" rx="10" fill="#160e1e" stroke="#c084fc" stroke-width="1"/>
+    <text x="480" y="700" text-anchor="middle" fill="#c084fc" font-family="Outfit" font-size="13" font-weight="700">Traceable Answer</text>
+    <text x="480" y="718" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">With page &amp; section refs</text>
+
+    <rect x="620" y="680" width="200" height="50" rx="10" fill="#160e1e" stroke="#c084fc" stroke-width="1"/>
+    <text x="720" y="700" text-anchor="middle" fill="#c084fc" font-family="Outfit" font-size="13" font-weight="700">No Hallucination</text>
+    <text x="720" y="718" text-anchor="middle" fill="#6070a0" font-family="Outfit" font-size="11">Grounded in raw content</text>
+
+    <!-- connect to bottom -->
+    <line x1="600" y1="455" x2="480" y2="680" stroke="#c084fc" stroke-width="1" stroke-opacity="0.3" stroke-dasharray="4,4"/>
+    <line x1="600" y1="455" x2="720" y2="680" stroke="#c084fc" stroke-width="1" stroke-opacity="0.3" stroke-dasharray="4,4"/>
+
+    <!-- top conn -->
+    <line x1="600" y1="345" x2="600" y2="230" stroke="#ffd166" stroke-width="1" stroke-opacity="0.3" stroke-dasharray="4,4"/>
+
+    <!-- Legend -->
+    <rect x="20" y="730" width="200" height="55" rx="8" fill="#111530" stroke="#1e2440" stroke-width="1"/>
+    <text x="30" y="748" fill="#6070a0" font-family="Space Mono" font-size="9" letter-spacing="1">LEGEND</text>
+    <circle cx="36" cy="763" r="4" fill="#4fffb0"/>
+    <text x="46" y="766" fill="#6070a0" font-family="Outfit" font-size="10">Indexing Phase</text>
+    <circle cx="36" cy="778" r="4" fill="#5c7dff"/>
+    <text x="46" y="781" fill="#6070a0" font-family="Outfit" font-size="10">Retrieval Phase</text>
+    <circle cx="120" cy="763" r="4" fill="#c084fc"/>
+    <text x="130" y="766" fill="#6070a0" font-family="Outfit" font-size="10">Answer</text>
+    <circle cx="120" cy="778" r="4" fill="#ffd166"/>
+    <text x="130" y="781" fill="#6070a0" font-family="Outfit" font-size="10">Principles</text>
+  </svg>
+</div>
+```
+
+  </div>
+
+  <!-- TAB: INDEX GENERATION -->
+
+  <div class="tab-panel" id="tab-indexing">
+    <p class="section-title">Phase 1 — Tree Index Generation</p>
+
+```
+<div class="flow-section">
+  <div class="flow-title">
+    <div class="dot" style="background:#4fffb0;box-shadow:0 0 8px #4fffb0;"></div>
+    How PageIndex Builds the Document Tree
+  </div>
+  <p class="flow-subtitle">Source files: <code style="color:#5c7dff;font-family:Space Mono;font-size:12px;">pageindex/page_index.py</code> (PDF) &amp; <code style="color:#5c7dff;font-family:Space Mono;font-size:12px;">pageindex/page_index_md.py</code> (Markdown)</p>
+</div>
+
+<div class="pipeline">
+
+  <div class="step phase-index">
+    <div class="step-connector">
+      <div class="step-num">01</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-header">
+        <div class="step-label">Document Ingestion</div>
+        <div class="step-tag">Input Layer</div>
+      </div>
+      <p class="step-desc">The pipeline accepts a PDF or Markdown file. For PDFs, <code style="color:#4fffb0;font-family:Space Mono;font-size:11px;">pymupdf</code> and <code style="color:#4fffb0;font-family:Space Mono;font-size:11px;">PyPDF2</code> are used to extract raw page-level text. Each page's text is stored in a list indexed by page number. For Markdown, <code style="color:#4fffb0;font-family:Space Mono;font-size:11px;">#</code> headers determine the hierarchy level.</p>
+      <div class="step-detail">
+        <div class="step-detail-row">
+          <span class="step-detail-key">Entry point</span>
+          <span class="step-detail-val"><code style="font-family:Space Mono;font-size:11px;color:#5c7dff;">run_pageindex.py</code> — parses CLI args, calls <code style="font-family:Space Mono;font-size:11px;color:#5c7dff;">pdf_to_tree()</code> or <code style="font-family:Space Mono;font-size:11px;color:#5c7dff;">md_to_tree()</code></span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">PDF libraries</span>
+          <span class="step-detail-val">pymupdf (fitz), PyPDF2 — extract text per page, preserving order</span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">Config params</span>
+          <span class="step-detail-val"><code style="font-family:Space Mono;font-size:11px;color:#ffd166;">--toc-check-pages 20</code> · <code style="font-family:Space Mono;font-size:11px;color:#ffd166;">--max-pages-per-node 10</code> · <code style="font-family:Space Mono;font-size:11px;color:#ffd166;">--max-tokens-per-node 20000</code></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step phase-index">
+    <div class="step-connector">
+      <div class="step-num">02</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-header">
+        <div class="step-label">Table of Contents Detection</div>
+        <div class="step-tag">Structure Parsing</div>
+      </div>
+      <p class="step-desc">The first N pages (default: 20) are scanned for an existing Table of Contents. If a TOC is found, its hierarchical structure is parsed to define the tree skeleton — chapters and section boundaries become tree nodes. If no TOC exists, the LLM generates a structural outline by analyzing page content patterns.</p>
+      <div class="step-detail">
+        <div class="step-detail-row">
+          <span class="step-detail-key">PDF TOC</span>
+          <span class="step-detail-val">Scans first 20 pages for "Contents", "Index", or similar patterns. Extracts page numbers for section boundaries.</span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">Markdown TOC</span>
+          <span class="step-detail-val">Header level (#, ##, ###) directly maps to tree depth. <code style="font-family:Space Mono;font-size:11px;color:#ffd166;">#</code> = root, <code style="font-family:Space Mono;font-size:11px;color:#ffd166;">##</code> = L2, etc.</span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">LLM fallback</span>
+          <span class="step-detail-val">When no TOC is found, GPT-4o analyzes the first pages to infer logical section structure and generate TOC headings.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step phase-index">
+    <div class="step-connector">
+      <div class="step-num">03</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-header">
+        <div class="step-label">Hierarchical Node Construction</div>
+        <div class="step-tag">Tree Building</div>
+      </div>
+      <p class="step-desc">Each section from the TOC becomes a tree node. If a section exceeds <code style="color:#ffd166;font-family:Space Mono;font-size:11px;">max_pages_per_node</code> (10 pages) or <code style="color:#ffd166;font-family:Space Mono;font-size:11px;">max_tokens_per_node</code> (20,000 tokens), it is recursively split into child nodes. This ensures every node fits within the LLM's effective reasoning window while preserving natural semantic boundaries.</p>
+      <div class="step-detail">
+        <div class="step-detail-row">
+          <span class="step-detail-key">node_id</span>
+          <span class="step-detail-val">Sequential zero-padded string ("0001", "0002"…) — unique retrieval key for raw content lookup</span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">start_index / end_index</span>
+          <span class="step-detail-val">0-indexed page range (exclusive end). Enables precise raw text extraction at query time.</span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">nodes (children)</span>
+          <span class="step-detail-val">Array of child Node objects — recursive nesting creates the full tree. Leaves have empty <code style="font-family:Space Mono;font-size:11px;color:#ffd166;">nodes</code> array.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step phase-index">
+    <div class="step-connector">
+      <div class="step-num">04</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-header">
+        <div class="step-label">LLM Node Summarization</div>
+        <div class="step-tag">Enrichment</div>
+      </div>
+      <p class="step-desc">For each node, the raw page content in its range is passed to GPT-4o to generate a concise summary. These summaries serve as the retrieval "hints" — they allow the LLM at query time to reason about relevance without reading the full raw content. Doc-level descriptions are also generated when <code style="color:#ffd166;font-family:Space Mono;font-size:11px;">--if-add-doc-description yes</code>.</p>
+      <div class="step-detail">
+        <div class="step-detail-row">
+          <span class="step-detail-key">summary field</span>
+          <span class="step-detail-val">2-4 sentences capturing key facts, topics, named entities — optimized for LLM reasoning, not human reading</span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">prefix_summary</span>
+          <span class="step-detail-val">Some nodes carry context from their parent to make summaries self-contained for retrieval</span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">Toggle flags</span>
+          <span class="step-detail-val"><code style="font-family:Space Mono;font-size:11px;color:#ffd166;">--if-add-node-summary yes/no</code> · <code style="font-family:Space Mono;font-size:11px;color:#ffd166;">--if-add-doc-description yes/no</code></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step phase-index">
+    <div class="step-connector">
+      <div class="step-num">05</div>
+    </div>
+    <div class="step-body">
+      <div class="step-header">
+        <div class="step-label">JSON Tree Output</div>
+        <div class="step-tag">Storage</div>
+      </div>
+      <p class="step-desc">The complete tree is serialized to a JSON file. This becomes the persistent "index" — loaded into LLM context at query time. The JSON is human-readable, debuggable, and fully self-describing. No database or embedding infrastructure required.</p>
+      <div class="code-block">
+```
+
+<span class="c"># Example output structure</span>
+{
+<span class="k">“doc_description”</span>: <span class="s">“Federal Reserve Annual Report 2023…”</span>,
+<span class="k">“nodes”</span>: [
+{
+<span class="k">“title”</span>: <span class="s">“Financial Stability”</span>,
+<span class="k">“node_id”</span>: <span class="s">“0006”</span>,
+<span class="k">“start_index”</span>: <span class="v">21</span>,
+<span class="k">“end_index”</span>: <span class="v">22</span>,
+<span class="k">“summary”</span>: <span class="s">“The Federal Reserve monitors…”</span>,
+<span class="k">“nodes”</span>: [
+{
+<span class="k">“title”</span>: <span class="s">“Monitoring Financial Vulnerabilities”</span>,
+<span class="k">“node_id”</span>: <span class="s">“0007”</span>,
+<span class="k">“start_index”</span>: <span class="v">22</span>,
+<span class="k">“end_index”</span>: <span class="v">28</span>,
+<span class="k">“summary”</span>: <span class="s">“The Federal Reserve’s monitoring…”</span>
+}
+]
+}
+]
+}
+</div>
+</div>
+</div>
+
+```
+</div>
+
+<!-- Interactive Tree Example -->
+<div style="margin-top:48px;">
+  <p class="section-title">Example Tree Structure (Interactive)</p>
+  <div class="itree-container">
+    <div class="itree-node">
+      <div class="itree-card root">
+        <div class="itree-dot" style="background:#4fffb0;box-shadow:0 0 6px #4fffb0;"></div>
+        <div>
+          <div class="itree-label">📄 Federal Reserve Annual Report 2023</div>
+          <div class="itree-meta">doc root · 180 pages · GPT-4o summary</div>
+        </div>
+      </div>
+      <div class="itree-children">
+        <div class="itree-node">
+          <div class="itree-card">
+            <div class="itree-dot" style="background:#5c7dff;"></div>
+            <div>
+              <div class="itree-label">1. Monetary Policy</div>
+              <div class="itree-meta">node_id: 0001 · pages 1–20</div>
+            </div>
+          </div>
+          <div class="itree-children">
+            <div class="itree-card"><div class="itree-dot" style="background:#6070a0;"></div><div><div class="itree-label">1.1 Interest Rate Decisions</div><div class="itree-meta">node_id: 0002 · pages 1–10</div></div></div>
+            <div class="itree-card"><div class="itree-dot" style="background:#6070a0;"></div><div><div class="itree-label">1.2 Inflation Targets</div><div class="itree-meta">node_id: 0003 · pages 10–20</div></div></div>
+          </div>
+        </div>
+        <div class="itree-node">
+          <div class="itree-card">
+            <div class="itree-dot" style="background:#5c7dff;"></div>
+            <div>
+              <div class="itree-label">2. Economic Outlook</div>
+              <div class="itree-meta">node_id: 0004 · pages 21–40</div>
+            </div>
+          </div>
+        </div>
+        <div class="itree-node">
+          <div class="itree-card">
+            <div class="itree-dot" style="background:#5c7dff;"></div>
+            <div>
+              <div class="itree-label">6. Financial Stability</div>
+              <div class="itree-meta">node_id: 0006 · pages 21–22</div>
+            </div>
+          </div>
+          <div class="itree-children">
+            <div class="itree-card"><div class="itree-dot" style="background:#6070a0;"></div><div><div class="itree-label">6.1 Monitoring Financial Vulnerabilities</div><div class="itree-meta">node_id: 0007 · pages 22–28</div></div></div>
+            <div class="itree-card"><div class="itree-dot" style="background:#6070a0;"></div><div><div class="itree-label">6.2 Domestic & International Cooperation</div><div class="itree-meta">node_id: 0008 · pages 28–31</div></div></div>
+          </div>
+        </div>
+        <div class="itree-node">
+          <div class="itree-card">
+            <div class="itree-dot" style="background:#5c7dff;"></div>
+            <div>
+              <div class="itree-label">Appendix G – Statistical Tables</div>
+              <div class="itree-meta">node_id: 0031 · pages 155–180</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+  </div>
+
+  <!-- TAB: RETRIEVAL -->
+
+  <div class="tab-panel" id="tab-retrieval">
+    <p class="section-title">Phase 2 — Reasoning-Based Query Retrieval</p>
+
+```
+<div class="flow-section">
+  <div class="flow-title">
+    <div class="dot" style="background:#5c7dff;box-shadow:0 0 8px #5c7dff;"></div>
+    How PageIndex Finds Relevant Nodes for Your Query
+  </div>
+  <p class="flow-subtitle">The LLM navigates the tree index like a human expert — no cosine similarity, no embeddings, pure reasoning.</p>
+</div>
+
+<div class="pipeline">
+
+  <div class="step phase-retrieval">
+    <div class="step-connector">
+      <div class="step-num">01</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-header">
+        <div class="step-label">User Query Received</div>
+        <div class="step-tag">Query Input</div>
+      </div>
+      <p class="step-desc">A natural language question arrives. Unlike vector RAG which immediately embeds it, PageIndex does <em>nothing</em> to the query at this point — it will be passed verbatim to the LLM along with the tree structure. Chat history (if any) is also preserved to enable multi-turn contextual reasoning.</p>
+      <div class="step-detail">
+        <div class="step-detail-row">
+          <span class="step-detail-key">Example query</span>
+          <span class="step-detail-val">"What was the total value of deferred assets held by Reserve Banks in 2023?"</span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">Multi-turn context</span>
+          <span class="step-detail-val">Prior conversation history is included — if user asked about "financial assets" before, the retriever knows to stay in that domain</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step phase-retrieval">
+    <div class="step-connector">
+      <div class="step-num">02</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-header">
+        <div class="step-label">Tree JSON Injected into LLM Context</div>
+        <div class="step-tag">In-Context Index</div>
+      </div>
+      <p class="step-desc">The entire tree JSON (titles, node_ids, summaries, page ranges) is loaded directly into the LLM's context window. This is called the <strong style="color:#5c7dff;">in-context index</strong> — the LLM "reads" the document's Table of Contents in one pass, just like a human flipping to the front pages.</p>
+      <div class="step-detail">
+        <div class="step-detail-row">
+          <span class="step-detail-key">What's included</span>
+          <span class="step-detail-val">All node titles, summaries, node_ids, and page ranges for the entire document tree (NO raw page content yet)</span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">Why no raw text</span>
+          <span class="step-detail-val">Raw content of all pages would exceed context limits. The tree serves as a compact, reasoning-friendly map of the document.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step phase-retrieval">
+    <div class="step-connector">
+      <div class="step-num">03</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-header">
+        <div class="step-label">LLM Node Selection via Tree Reasoning</div>
+        <div class="step-tag">Core Intelligence</div>
+      </div>
+      <p class="step-desc">The LLM is prompted to reason over the tree structure and return a <code style="color:#ffd166;font-family:Space Mono;font-size:11px;">node_list</code> of relevant node_ids. It explicitly classifies each section as relevant or irrelevant based on query intent — not surface similarity. The LLM's "thinking" field makes this fully traceable.</p>
+      <div class="step-detail">
+        <div class="step-detail-row">
+          <span class="step-detail-key">Prompt template</span>
+          <span class="step-detail-val"><em>"You are given a question and a tree structure. Find all nodes likely to contain the answer. Return JSON with 'thinking' and 'node_list'."</em></span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">LLM reasoning</span>
+          <span class="step-detail-val">e.g., "Deferred assets → likely in financial statements section or Appendix G statistical tables → check nodes 0021, 0031"</span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">Cross-references</span>
+          <span class="step-detail-val">LLM follows "see Appendix G" hints in summaries — navigates to that node automatically, unlike vector search</span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">Multi-node</span>
+          <span class="step-detail-val">Returns a list — multiple nodes may be selected if the answer requires synthesizing across sections</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step phase-retrieval">
+    <div class="step-connector">
+      <div class="step-num">04</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-header">
+        <div class="step-label">Raw Content Extraction from Selected Nodes</div>
+        <div class="step-tag">Content Fetch</div>
+      </div>
+      <p class="step-desc">Using the selected <code style="color:#ffd166;font-family:Space Mono;font-size:11px;">node_ids</code>, the system looks up the corresponding page ranges (<code style="color:#ffd166;font-family:Space Mono;font-size:11px;">start_index → end_index</code>) and extracts the raw text from those PDF pages. Only these specific pages are loaded — targeted extraction, not the full document. For vision-based pipelines, page images are extracted instead of text.</p>
+      <div class="step-detail">
+        <div class="step-detail-row">
+          <span class="step-detail-key">Lookup mechanism</span>
+          <span class="step-detail-val"><code style="font-family:Space Mono;font-size:11px;color:#5c7dff;">node_id → (start_index, end_index) → raw text pages</code></span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">Coherence preserved</span>
+          <span class="step-detail-val">Full natural sections retrieved — no mid-sentence cuts like fixed-chunk RAG. Context integrity intact.</span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">Vision RAG variant</span>
+          <span class="step-detail-val">Page images (not text) are extracted and passed to a VLM — handles complex tables, charts, grids natively</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step phase-retrieval">
+    <div class="step-connector">
+      <div class="step-num">05</div>
+      <div class="step-line"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-header">
+        <div class="step-label">Sufficiency Check (Agentic Loop)</div>
+        <div class="step-tag">Agentic Decision</div>
+      </div>
+      <p class="step-desc">In the agentic retrieval mode, the LLM evaluates whether the extracted content is <em>sufficient</em> to answer the query. If not, it loops back — selecting additional nodes or drilling into sub-nodes. This iterative refinement mimics how a human re-reads sections when the first try doesn't yield the answer.</p>
+      <div class="step-detail">
+        <div class="step-detail-row">
+          <span class="step-detail-key">Sufficient → </span>
+          <span class="step-detail-val">Proceed to answer generation with accumulated context</span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">Not sufficient → </span>
+          <span class="step-detail-val">Loop: expand node selection, fetch neighboring nodes, or check child nodes for more detail</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step phase-answer">
+    <div class="step-connector">
+      <div class="step-num">06</div>
+    </div>
+    <div class="step-body">
+      <div class="step-header">
+        <div class="step-label">Answer Generation with Grounded Context</div>
+        <div class="step-tag">Final Output</div>
+      </div>
+      <p class="step-desc">The retrieved raw content from selected nodes is assembled and passed to the LLM alongside the original query. The answer is generated grounded in the specific pages, with full traceability — the response can cite exact section titles and page numbers. This is the final context window: <strong style="color:#c084fc;">Query + Retrieved Node Content → Answer</strong>.</p>
+      <div class="step-detail">
+        <div class="step-detail-row">
+          <span class="step-detail-key">Context assembly</span>
+          <span class="step-detail-val"><code style="font-family:Space Mono;font-size:11px;color:#c084fc;">prompt = f"Question: {query}\n\nContext:\n{retrieved_text}\n\nAnswer:"</code></span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">Traceability</span>
+          <span class="step-detail-val">Each retrieved node's title and page range is known — answer can cite "Section 6.1, pages 22-28"</span>
+        </div>
+        <div class="step-detail-row">
+          <span class="step-detail-key">Streaming</span>
+          <span class="step-detail-val">Retrieval happens inline during reasoning — TTFT (time-to-first-token) is not blocked by a retrieval gate</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Annotated Tree during retrieval -->
+<div style="margin-top:48px;">
+  <p class="section-title">Example: Retrieval for "What is the total value of deferred assets?"</p>
+  <div class="itree-container">
+    <div style="margin-bottom:16px;font-size:13px;color:#6070a0;">🟢 = LLM selected as relevant &nbsp;·&nbsp; 🔴 = LLM skipped as irrelevant</div>
+    <div class="itree-node">
+      <div class="itree-card root">
+        <div class="itree-dot" style="background:#4fffb0;"></div>
+        <div>
+          <div class="itree-label">📄 Federal Reserve Annual Report 2023</div>
+          <div class="itree-meta">Full tree in LLM context → reasons across all 31 nodes</div>
+        </div>
+      </div>
+      <div class="itree-children">
+        <div class="itree-card" style="opacity:0.5;">
+          <div class="itree-dot" style="background:#6070a0;"></div>
+          <div><div class="itree-label">1. Monetary Policy Overview</div><div class="itree-meta">node_id: 0001</div></div>
+          <span class="irrelevant-badge">skipped</span>
+        </div>
+        <div class="itree-card" style="opacity:0.5;">
+          <div class="itree-dot" style="background:#6070a0;"></div>
+          <div><div class="itree-label">2. Economic Outlook</div><div class="itree-meta">node_id: 0004</div></div>
+          <span class="irrelevant-badge">skipped</span>
+        </div>
+        <div class="itree-card relevant">
+          <div class="itree-dot" style="background:#4fffb0;box-shadow:0 0 6px #4fffb0;"></div>
+          <div><div class="itree-label">5. Financial Statements (Balance Sheet)</div><div class="itree-meta">node_id: 0021 · pages 75–82 · summary mentions "deferred assets reported"</div></div>
+          <span class="relevance-badge">selected ✓</span>
+        </div>
+        <div style="margin-left:32px;padding-left:16px;border-left:1px dashed #4fffb066;margin-top:4px;margin-bottom:8px;">
+          <div style="font-family:Space Mono;font-size:11px;color:#4fffb0;padding:8px;background:rgba(79,255,176,0.05);border-radius:6px;border:1px solid rgba(79,255,176,0.15);">
+            LLM reasoning: "Page 77 of the main section says 'Table 5.3 summarizes...' and references 'Appendix G for detailed statistical tables' → I must also check Appendix G"
+          </div>
+        </div>
+        <div class="itree-card relevant">
+          <div class="itree-dot" style="background:#4fffb0;box-shadow:0 0 6px #4fffb0;"></div>
+          <div><div class="itree-label">Appendix G – Statistical Tables (Table 5.3)</div><div class="itree-meta">node_id: 0031 · pages 155–180 · followed cross-reference</div></div>
+          <span class="relevance-badge">selected ✓</span>
+        </div>
+        <div style="margin-left:32px;padding-left:16px;border-left:1px dashed #4fffb066;margin-top:4px;">
+          <div style="font-family:Space Mono;font-size:11px;color:#4fffb0;padding:8px;background:rgba(79,255,176,0.05);border-radius:6px;border:1px solid rgba(79,255,176,0.15);">
+            ✓ Appendix G contains Table 5.3 with the exact deferred asset total — vector RAG would have missed this cross-reference!
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+  </div>
+
+  <!-- TAB: PROMPTS -->
+
+  <div class="tab-panel" id="tab-prompts">
+    <p class="section-title">The LLM Prompts — What Gets Sent to GPT-4o</p>
+
+```
+<div style="margin-bottom:32px;">
+  <div class="flow-title" style="margin-bottom:12px;">
+    <div class="dot" style="background:#ff9a3c;box-shadow:0 0 8px #ff9a3c;"></div>
+    Indexing Phase — Node Summarization Prompt
+  </div>
+  <div class="prompt-box">
+    <div class="prompt-header">
+      <div class="prompt-header-dot" style="background:#ff9a3c;"></div>
+      <div class="prompt-header-dot" style="background:#ffd166;"></div>
+      <div class="prompt-header-dot" style="background:#4fffb0;"></div>
+      <span class="prompt-header-label">page_index.py — summarize_node_content()</span>
+    </div>
+    <div class="prompt-content">
+```
+
+<span class="comment"># Sent once per node during tree construction</span>
+
+<span class="highlight">You are analyzing a section of a document.</span>
+<span class="highlight">Generate a concise summary of the following content</span>
+<span class="highlight">that captures the key information, topics, and facts.</span>
+<span class="highlight">The summary should help an LLM determine if this section</span>
+<span class="highlight">is relevant to a user’s question.</span>
+
+<span class="comment">—CONTENT (pages {start} to {end})—</span>
+<span class="highlight3">{raw_page_text}</span>
+<span class="comment">—END CONTENT—</span>
+
+<span class="highlight2">Return only the summary text, 2-4 sentences maximum.</span>
+</div>
+</div>
+</div>
+
+```
+<div style="margin-bottom:32px;">
+  <div class="flow-title" style="margin-bottom:12px;">
+    <div class="dot" style="background:#5c7dff;box-shadow:0 0 8px #5c7dff;"></div>
+    Retrieval Phase — Node Selection Prompt (Core Retrieval)
+  </div>
+  <div class="prompt-box">
+    <div class="prompt-header">
+      <div class="prompt-header-dot" style="background:#ff6b6b;"></div>
+      <div class="prompt-header-dot" style="background:#ffd166;"></div>
+      <div class="prompt-header-dot" style="background:#4fffb0;"></div>
+      <span class="prompt-header-label">cookbook/pageindex_RAG_simple.ipynb — retrieve_nodes()</span>
+    </div>
+    <div class="prompt-content">
+```
+
+<span class="comment"># This is sent at query time — the most important prompt in PageIndex</span>
+
+<span class="highlight">You are given a question and a tree structure of a document.</span>
+<span class="highlight">You need to find all nodes that are likely to contain the answer.</span>
+
+<span class="highlight2">Question:</span> <span class="highlight3">{question}</span>
+
+<span class="highlight2">Document tree structure:</span>
+<span class="highlight3">{json_tree_structure}</span>
+<span class="comment">  # Full JSON with titles, summaries, node_ids, page ranges</span>
+{
+“node_id”: “0006”,
+“title”: “Financial Stability”,
+“start_index”: 21, “end_index”: 22,
+“summary”: “The Federal Reserve monitors…”,
+“nodes”: […]
+}
+
+<span class="highlight">Reply in the following JSON format:</span>
+{
+<span class="highlight2">“thinking”</span>: <span class="highlight3"><your reasoning about where the answer is likely located></span>,
+<span class="highlight2">“node_list”</span>: [<span class="highlight3">node_id1, node_id2, …</span>]
+}
+
+<span class="comment"># LLM reasons: “deferred assets → financial statements section</span>
+<span class="comment"># → Appendix G referenced in page 77 summary → select 0021, 0031”</span>
+</div>
+</div>
+</div>
+
+```
+<div style="margin-bottom:32px;">
+  <div class="flow-title" style="margin-bottom:12px;">
+    <div class="dot" style="background:#c084fc;box-shadow:0 0 8px #c084fc;"></div>
+    Answer Generation Prompt — Final Context Assembly
+  </div>
+  <div class="prompt-box">
+    <div class="prompt-header">
+      <div class="prompt-header-dot" style="background:#ff6b6b;"></div>
+      <div class="prompt-header-dot" style="background:#ffd166;"></div>
+      <div class="prompt-header-dot" style="background:#4fffb0;"></div>
+      <span class="prompt-header-label">cookbook — generate_answer()</span>
+    </div>
+    <div class="prompt-content">
+```
+
+<span class="comment"># Sent after node content is fetched from relevant page ranges</span>
+
+<span class="highlight">You are a document analysis assistant. Answer the question</span>
+<span class="highlight">based only on the provided document context.</span>
+<span class="highlight">Be precise and cite specific sections when possible.</span>
+
+<span class="highlight2">Question:</span>
+<span class="highlight3">{user_query}</span>
+
+<span class="highlight2">Relevant Document Context:</span>
+<span class="comment">— Section: “Financial Statements (Balance Sheet)” (pages 75-82) —</span>
+<span class="highlight3">{raw_text_node_0021}</span>
+
+<span class="comment">— Section: “Appendix G – Statistical Tables” (pages 155-180) —</span>
+<span class="highlight3">{raw_text_node_0031}</span>
+
+<span class="highlight2">Answer:</span>
+<span class="comment"># LLM generates grounded answer with section citations</span>
+<span class="comment"># “According to Table 5.3 in Appendix G (pages 155-180),</span>
+<span class="comment">#  the total deferred assets were $47.3 billion as of Dec 2023.”</span>
+</div>
+</div>
+</div>
+
+```
+<div>
+  <div class="flow-title" style="margin-bottom:12px;">
+    <div class="dot" style="background:#ffd166;box-shadow:0 0 8px #ffd166;"></div>
+    Agentic Loop Prompt — Sufficiency Check
+  </div>
+  <div class="prompt-box">
+    <div class="prompt-header">
+      <div class="prompt-header-dot" style="background:#ff6b6b;"></div>
+      <div class="prompt-header-dot" style="background:#ffd166;"></div>
+      <div class="prompt-header-dot" style="background:#4fffb0;"></div>
+      <span class="prompt-header-label">cookbook/agentic_retrieval — sufficiency_check()</span>
+    </div>
+    <div class="prompt-content">
+```
+
+<span class="comment"># In agentic mode, after fetching node content:</span>
+
+<span class="highlight">Given the question and the retrieved content below,</span>
+<span class="highlight">determine if you have sufficient information to answer.</span>
+
+<span class="highlight2">Question:</span> <span class="highlight3">{question}</span>
+
+<span class="highlight2">Retrieved Content So Far:</span>
+<span class="highlight3">{accumulated_context}</span>
+
+<span class="highlight">Reply with JSON:</span>
+{
+<span class="highlight2">“sufficient”</span>: <span class="highlight3">true | false</span>,
+<span class="highlight2">“reasoning”</span>: <span class="highlight3">“why or why not”</span>,
+<span class="highlight2">“additional_nodes_needed”</span>: [<span class="highlight3">node_ids if not sufficient</span>]
+}
+
+<span class="comment"># If false → loops back, fetches additional nodes, checks again</span>
+<span class="comment"># If true → proceeds to final answer generation</span>
+</div>
+</div>
+</div>
+
+  </div>
+
+  <!-- TAB: COMPARISON -->
+
+  <div class="tab-panel" id="tab-compare">
+    <p class="section-title">PageIndex vs Traditional Vector RAG</p>
+
+```
+<table class="compare-table">
+  <tr>
+    <th>Dimension</th>
+    <th>Vector-based RAG</th>
+    <th>PageIndex (Reasoning-based)</th>
+  </tr>
+  <tr>
+    <td>Document Preparation</td>
+    <td><span class="tag-bad">chunk</span> Fixed-size text splits (512–1000 tokens) breaking semantic boundaries</td>
+    <td><span class="tag-good">natural</span> Hierarchical sections from real document structure — chapters, pages, logical units</td>
+  </tr>
+  <tr>
+    <td>Index Type</td>
+    <td><span class="tag-bad">external</span> Vector database (Pinecone, Chroma, FAISS) with embedding vectors</td>
+    <td><span class="tag-good">in-context</span> JSON tree structure loaded directly into LLM context — no DB infra</td>
+  </tr>
+  <tr>
+    <td>Retrieval Method</td>
+    <td><span class="tag-bad">similarity</span> Cosine similarity / approximate nearest neighbor search</td>
+    <td><span class="tag-good">reasoning</span> LLM explicitly reasons: "Where is this answer most likely located?" → returns node_ids</td>
+  </tr>
+  <tr>
+    <td>Query Understanding</td>
+    <td>Query intent → embedding vector → surface semantic match</td>
+    <td>Query intent → LLM reasoning → navigation decision → structural match</td>
+  </tr>
+  <tr>
+    <td>Cross-References</td>
+    <td><span class="tag-bad">fails</span> "See Appendix G" — doesn't follow internal links; Appendix text not similar to query</td>
+    <td><span class="tag-good">follows</span> LLM reads "see Appendix G" in a summary and navigates there in the next loop</td>
+  </tr>
+  <tr>
+    <td>Chat History</td>
+    <td><span class="tag-bad">isolated</span> Each query embedded independently — no memory of prior turns</td>
+    <td><span class="tag-good">contextual</span> Full conversation history in prompt — LLM adjusts retrieval based on prior Q&amp;A</td>
+  </tr>
+  <tr>
+    <td>Explainability</td>
+    <td><span class="tag-bad">opaque</span> "Top-k most similar chunks" — no rationale for why chunks were selected</td>
+    <td><span class="tag-good">traceable</span> LLM's "thinking" field explains exactly why each node was selected</td>
+  </tr>
+  <tr>
+    <td>Infrastructure</td>
+    <td>Embedding model + vector DB + index maintenance + synchronization</td>
+    <td><span class="tag-good">simple</span> Just a JSON file + LLM API. Update a section → re-index only that subtree</td>
+  </tr>
+  <tr>
+    <td>Domain Expertise</td>
+    <td>Embedding similarity misses domain-specific relevance (e.g., tax table vs tax discussion)</td>
+    <td><span class="tag-good">expert</span> LLM applies domain knowledge: "financial liabilities are in balance sheet, not MD&amp;A"</td>
+  </tr>
+  <tr>
+    <td>Accuracy (FinanceBench)</td>
+    <td><span class="tag-bad">lower</span> Typical vector RAG: 60–85% on complex financial docs</td>
+    <td><span class="tag-good">98.7%</span> State-of-the-art — Mafin 2.5 powered by PageIndex</td>
+  </tr>
+  <tr>
+    <td>Semantic Integrity</td>
+    <td><span class="tag-bad">fragmented</span> Fixed chunks split sentences, break tables, sever context</td>
+    <td><span class="tag-good">coherent</span> Full natural sections retrieved — tables and paragraphs stay intact</td>
+  </tr>
+  <tr>
+    <td>Best For</td>
+    <td>Short texts, semantic similarity search, product recommendations, "vibe retrieval"</td>
+    <td>Long professional documents: financial reports, legal filings, technical manuals, academic texts</td>
+  </tr>
+</table>
+
+<div style="margin-top:40px;">
+  <p class="section-title">Key Insight: Similarity ≠ Relevance</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
+    <div style="background:rgba(255,107,107,0.06);border:1px solid rgba(255,107,107,0.2);border-radius:12px;padding:20px;">
+      <div style="color:#ff6b6b;font-weight:700;font-size:14px;margin-bottom:10px;font-family:Space Mono;letter-spacing:1px;">VECTOR SEARCH FAILURE MODE</div>
+      <p style="color:#6070a0;font-size:13px;line-height:1.7;">Query: "What is the total deferred asset value?"<br><br>
+      Vector search finds: chunks mentioning "deferred" and "assets" in the main body (pages 75-82) ✓<br><br>
+      But misses: Appendix G (pages 155-180) which contains the actual <em>total</em> — because "Statistical Tables" is not semantically similar to "deferred assets" ✗</p>
+    </div>
+    <div style="background:rgba(79,255,176,0.06);border:1px solid rgba(79,255,176,0.2);border-radius:12px;padding:20px;">
+      <div style="color:#4fffb0;font-weight:700;font-size:14px;margin-bottom:10px;font-family:Space Mono;letter-spacing:1px;">PAGEINDEX SOLUTION</div>
+      <p style="color:#6070a0;font-size:13px;line-height:1.7;">LLM reads node 0021 summary: "...reports the increase in deferred assets. See Table 5.3 in Appendix G for totals."<br><br>
+      LLM thinks: "Cross-reference to Appendix G → navigate there" → selects node 0031 ✓<br><br>
+      Retrieves Appendix G content → finds exact total → correct answer ✓</p>
+    </div>
+  </div>
+</div>
+```
+
+  </div>
+
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>
