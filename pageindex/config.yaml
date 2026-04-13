@@ -1,0 +1,15 @@
+model: "gpt-4.1"
+provider: "azure"
+azure_endpoint: null
+azure_api_version: "2024-12-01-preview"
+azure_deployment_name: null
+llm_max_concurrency: 8
+tree_worker_count: 2
+pdf_page_worker_count: 8
+toc_check_page_num: 20
+max_page_num_each_node: 10
+max_token_num_each_node: 20000
+if_add_node_id: "yes"
+if_add_node_summary: "yes"
+if_add_doc_description: "no"
+if_add_node_text: "no"
